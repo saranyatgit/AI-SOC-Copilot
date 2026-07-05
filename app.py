@@ -7,6 +7,7 @@ st.set_page_config(
     page_title="AI-Powered SOC Analyst Assistant",
     layout="wide"
 )
+st.sidebar.success("Navigation")
 
 page = st.sidebar.selectbox(
     "Navigation",

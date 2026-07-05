@@ -1,10 +1,11 @@
 import os
 import joblib
 import pandas as pd
+import streamlit as st
 
 from sklearn.ensemble import IsolationForest
 
-
+@st.cache_data
 def load_processed_data():
     data_path = "data/raw/combined_logs.csv"   # Change if your file is elsewhere
     df = pd.read_csv(data_path)
@@ -46,7 +47,7 @@ def save_model(model):
     os.makedirs("models", exist_ok=True)
     joblib.dump(model, "models/isolation_forest.pkl")
 
-
+@st.cache_resource
 def load_model():
     return joblib.load("models/isolation_forest.pkl")
 

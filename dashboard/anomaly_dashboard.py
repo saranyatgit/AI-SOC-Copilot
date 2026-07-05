@@ -1,4 +1,5 @@
 import streamlit as st
+from ai.gemini_explainer import explain_threat
 
 from ml.anomaly_detector import (
     load_processed_data,
@@ -29,12 +30,18 @@ def show_anomaly_dashboard():
     # Add prediction column
     df["Prediction"] = predictions
 
+    # Convert predictions to text
+    df["Prediction"] = df["Prediction"].replace({
+        1: "Normal",
+        -1: "Suspicious"
+    })
+
     # Add risk score
     df["Risk"] = df["Prediction"].apply(assign_risk)
 
     # Dashboard metrics
-    total_anomalies = (df["Prediction"] == -1).sum()
-    total_normal = (df["Prediction"] == 1).sum()
+    total_anomalies = (df["Prediction"] == "Suspicious").sum()
+    total_normal = (df["Prediction"] == "Normal").sum()
     suspicious_percentage = (total_anomalies / len(df)) * 100
 
     col1, col2, col3 = st.columns(3)
@@ -42,12 +49,6 @@ def show_anomaly_dashboard():
     col1.metric("🚨 Total Anomalies", total_anomalies)
     col2.metric("🟢 Normal Traffic", total_normal)
     col3.metric("⚠️ Suspicious %", f"{suspicious_percentage:.2f}%")
-
-    # Convert predictions to text
-    df["Prediction"] = df["Prediction"].replace({
-        1: "Normal",
-        -1: "Suspicious"
-    })
 
     st.subheader("Threat Detection Results")
 
@@ -64,6 +65,36 @@ def show_anomaly_dashboard():
         "Prediction",
         "Risk"
     ])
+
     df = df.reset_index(drop=True)
 
     st.dataframe(df[display_columns])
+
+    # ======================================================
+    # Gemini AI Threat Explanation
+    # ======================================================
+
+    st.subheader("🤖 AI Threat Explanation")
+
+    suspicious = df[df["Prediction"] == "Suspicious"]
+
+    if not suspicious.empty:
+
+        row = suspicious.iloc[0]
+        st.write("A suspicious network flow has been detected.")
+
+        if st.button("Analyze with Gemini"):
+             with st.spinner("Analyzing threat using Gemini AI..."):
+                 
+
+                explanation = explain_threat(
+                     destination_port=row["Destination Port"],
+                     flow_duration=row["Flow Duration"],
+                     prediction=row["Prediction"],
+                     risk=row["Risk"]
+             )
+
+             st.success(explanation)
+
+        else:
+             st.success("✅ No suspicious traffic detected.")
