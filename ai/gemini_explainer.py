@@ -9,25 +9,68 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel("gemini-2.5-flash")
 
 
-def explain_threat(destination_port, flow_duration, prediction, risk):
-    prompt = f"""
-You are an expert SOC Analyst.
+def explain_threat(
+        destination_port,
+        flow_duration,
+        prediction,
+        risk,
+        tactic,
+        technique,
+        technique_id,
+        description,
+        mitigation):
 
-Analyze this network traffic.
+    prompt = f"""
+You are an expert Security Operations Center (SOC) Analyst.
+
+Analyze the following suspicious network traffic.
+
+==========================
+Network Information
+==========================
 
 Destination Port : {destination_port}
 Flow Duration : {flow_duration}
-Prediction : {prediction}
-Risk : {risk}
+
+Attack Type : {prediction}
+
+Risk Level : {risk}
+
+==========================
+MITRE ATT&CK Mapping
+==========================
+
+Tactic : {tactic}
+
+Technique : {technique}
+
+Technique ID : {technique_id}
+
+Description :
+
+{description}
+
+Recommended Mitigation :
+
+{mitigation}
+
+==========================
 
 Provide:
 
 1. Threat Summary
-2. Why it is suspicious
-3. Risk Level
-4. Recommended Action
 
-Keep the answer under 150 words.
+2. Why this attack is dangerous
+
+3. Explain the MITRE ATT&CK technique
+
+4. Indicators of Compromise (IoCs)
+
+5. Recommended actions for the SOC analyst
+
+6. Business impact
+
+Keep the answer under 200 words.
 """
 
     response = model.generate_content(prompt)
