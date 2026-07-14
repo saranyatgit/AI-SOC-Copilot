@@ -7,7 +7,7 @@ from sklearn.ensemble import IsolationForest
 
 @st.cache_data
 def load_processed_data():
-    data_path = "data/raw/combined_logs.csv"   # Change if your file is elsewhere
+    data_path = "data/raw/combined_logs.csv"  
     df = pd.read_csv(data_path)
     df.columns = df.columns.str.strip()
 
@@ -17,10 +17,9 @@ def load_processed_data():
 
 
 def prepare_features(df):
-    # Select only numeric columns (no .copy())
+   
     features = df.select_dtypes(include=["number"])
 
-    # Drop Label only if it somehow exists
     if "Label" in features.columns:
         features = features.drop(columns=["Label"])
 
@@ -69,7 +68,7 @@ if __name__ == "__main__":
 
     print("\nModel Saved Successfully!")
 
-    # Load the saved model again
+    
     model = load_model()
 
     print("\nModel features:")

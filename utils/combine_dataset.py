@@ -2,7 +2,6 @@ import pandas as pd
 import glob
 import os
 
-# Path to all CSV files
 files = glob.glob("data/raw/cicids2017/*.csv")
 
 dfs = []
@@ -11,10 +10,8 @@ for file in files:
     print(f"Loading: {os.path.basename(file)}")
     dfs.append(pd.read_csv(file))
 
-# Combine all files
 combined_df = pd.concat(dfs, ignore_index=True)
 
-# Save combined dataset
 combined_df.to_csv("data/raw/combined_logs.csv", index=False)
 
 print("\nDataset Combined Successfully!")

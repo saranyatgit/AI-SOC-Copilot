@@ -47,9 +47,7 @@ app = FastAPI(
 init_db()
 
 
-# ==============================================
-# Schemas
-# ==============================================
+
 
 class Incident(BaseModel):
     id: int
@@ -84,9 +82,7 @@ class DeleteResponse(BaseModel):
     message: str
 
 
-# ==============================================
-# Routes
-# ==============================================
+
 
 @app.get("/health")
 def health_check():

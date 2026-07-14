@@ -8,4 +8,3 @@ __pycache__/
 # Large datasets
 data/raw/
 
-models/isolation_forest.pkl 

@@ -27,9 +27,7 @@ def show_csv_upload():
         st.info("Waiting for a CSV file to be uploaded.")
         return
 
-    # ==========================================
-    # Read & Normalize
-    # ==========================================
+    
 
     try:
         df = pd.read_csv(uploaded_file)
@@ -37,16 +35,13 @@ def show_csv_upload():
         st.error(f"Could not read this file as CSV: {e}")
         return
 
-    # CICIDS2017 exports commonly have leading/trailing spaces in headers
     df.columns = df.columns.str.strip()
 
     st.subheader("📄 Uploaded Data Preview")
     st.write(f"**Rows:** {len(df)}  |  **Columns:** {len(df.columns)}")
     st.dataframe(df.head(20))
 
-    # ==========================================
-    # Feature Preparation & Prediction
-    # ==========================================
+   
 
     st.subheader("🧠 Running Threat Detection")
 
@@ -62,12 +57,7 @@ def show_csv_upload():
         st.error(f"Could not prepare features from this file: {e}")
         return
 
-    # prepare_features() just grabs every numeric column in the uploaded
-    # file, so it never fails on its own even if the file is the wrong
-    # shape. The model, however, was trained on a specific set of numeric
-    # columns in a specific order (model.feature_names_in_), so we check
-    # against that explicitly rather than letting scikit-learn raise a
-    # raw ValueError deep inside predict().
+    
     expected_columns = list(model.feature_names_in_)
 
     missing_columns = [
@@ -82,13 +72,10 @@ def show_csv_upload():
         )
         return
 
-    # Reindex to the exact training column order. Any extra numeric
-    # columns in the upload that the model wasn't trained on are simply
-    # not passed in.
+   
     features = raw_features[expected_columns]
 
-    # Handle missing (NaN) values in required columns by filling with
-    # each column's median, rather than failing the whole upload.
+   
     missing_counts = features.isnull().sum()
     missing_counts = missing_counts[missing_counts > 0]
 
@@ -117,9 +104,7 @@ def show_csv_upload():
 
     df["Risk"] = df["Prediction"].apply(assign_risk)
 
-    # ==========================================
-    # Summary KPIs
-    # ==========================================
+    
 
     total_flows = len(df)
     anomalies_detected = int((df["Prediction"] == "Suspicious").sum())
@@ -132,9 +117,7 @@ def show_csv_upload():
     col3.metric("🔴 High Risk", high_risk)
     col4.metric("📈 Anomaly Rate", f"{anomaly_rate:.2f}%")
 
-    # ==========================================
-    # Results Table
-    # ==========================================
+   
 
     st.subheader("📊 Results")
 
@@ -165,9 +148,7 @@ def show_csv_upload():
         st.success("✅ No suspicious traffic detected in this upload.")
         return
 
-    # ==========================================
-    # Investigate a Suspicious Flow
-    # ==========================================
+    
 
     st.divider()
     st.subheader("🤖 Investigate a Suspicious Flow")

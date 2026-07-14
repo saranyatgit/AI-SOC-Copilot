@@ -1,9 +1,7 @@
 import pandas as pd
 
-# Load Dataset
 df = pd.read_csv("data/raw/combined_logs.csv")
 
-# Remove extra spaces from column names
 df.columns = df.columns.str.strip()
 
 def get_total_flows():
