@@ -1,29 +1,32 @@
 import streamlit as st
 import pandas as pd
 
-
 def load_logs():
-    df = pd.read_csv("data/raw/security_logs.csv")
-    return df
-
+    return pd.read_csv("data/raw/security_logs.csv")
 
 def show_dashboard():
-    st.title("AI-Powered SOC Analyst Assistant")
-
-    st.header("Security Log Viewer")
+    st.title("📋 Security Log Viewer")
 
     df = load_logs()
 
-    st.subheader("Dataset Information")
+    c1,c2,c3=st.columns(3)
+    c1.metric("Total Logs",len(df))
+    c2.metric("Columns",len(df.columns))
+    c3.metric("Memory",f"{df.memory_usage(deep=True).sum()/1024:.1f} KB")
 
-    col1, col2 = st.columns(2)
+    st.divider()
 
-    with col1:
-        st.metric("Total Logs", len(df))
+    search = st.text_input("🔍 Search")
 
-    with col2:
-        st.metric("Number of Columns", len(df.columns))
+    if search:
+        mask=df.astype(str).apply(lambda x:x.str.contains(search,case=False,na=False)).any(axis=1)
+        df=df[mask]
 
-    st.subheader("Dataset Preview")
+    st.dataframe(df,use_container_width=True,height=500)
 
-    st.dataframe(df)
+    st.download_button(
+        "⬇️ Download Logs (CSV)",
+        df.to_csv(index=False),
+        "security_logs.csv",
+        mime="text/csv"
+    )

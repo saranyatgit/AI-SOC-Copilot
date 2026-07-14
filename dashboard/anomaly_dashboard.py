@@ -1,238 +1,100 @@
+
 import streamlit as st
 
 from ai.gemini_explainer import explain_threat
 from reports.pdf_report import generate_report
 from threat_intelligence.mitre_mapper import get_attack_details
+from utils.incident_db import insert_incident
 from ml.anomaly_detector import (
-    load_processed_data,
-    prepare_features,
-    load_model,
-    predict_anomalies,
+    load_processed_data, prepare_features,
+    load_model, predict_anomalies
 )
-
 from utils.risk_score import assign_risk
 
-
 def show_anomaly_dashboard():
-
     st.title("🚨 AI Threat Detection")
 
-    # ==========================================
-    # Load Dataset
-    # ==========================================
-
     df = load_processed_data()
-
-    # ==========================================
-    # Prepare Features
-    # ==========================================
-
     features = prepare_features(df)
-
-    # ==========================================
-    # Load Model
-    # ==========================================
-
     model = load_model()
 
-    # ==========================================
-    # Predict Anomalies
-    # ==========================================
-
-    predictions = predict_anomalies(model, features)
-
-    df["Prediction"] = predictions
-
-    df["Prediction"] = df["Prediction"].replace({1: "Normal", -1: "Suspicious"})
-
-    # ==========================================
-    # Assign Risk
-    # ==========================================
-
+    pred = predict_anomalies(model, features)
+    df["Prediction"] = ["Normal" if p == 1 else "Suspicious" for p in pred]
     df["Risk"] = df["Prediction"].apply(assign_risk)
 
-    # ==========================================
-    # KPI Calculations
-    # ==========================================
+    total=len(df)
+    suspicious=df[df["Prediction"]=="Suspicious"]
 
-    total_flows = len(df)
+    c1,c2,c3,c4=st.columns(4)
+    c1.metric("Network Flows",total)
+    c2.metric("Suspicious",len(suspicious))
+    c3.metric("High Risk",(df["Risk"]=="🔴 High").sum())
+    c4.metric("Detection Rate",f"{len(suspicious)/total*100:.2f}%")
 
-    if "Label" in df.columns:
-        attack_records = (df["Label"] != "BENIGN").sum()
-        benign_records = (df["Label"] == "BENIGN").sum()
-    else:
-        attack_records = 0
-        benign_records = 0
+    st.divider()
 
-    high_risk_incidents = (df["Risk"] == "High").sum()
-
-    anomalies_detected = (df["Prediction"] == "Suspicious").sum()
-
-    total_normal = (df["Prediction"] == "Normal").sum()
-
-    suspicious_percentage = (anomalies_detected / total_flows) * 100
-
-    detection_rate = suspicious_percentage
-
-    # ==========================================
-    # KPI Cards
-    # ==========================================
-
-    st.subheader("📊 Security Dashboard")
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("🌐 Total Network Flows", total_flows)
-
-    col2.metric("⚔️ Attack Records", attack_records)
-
-    col3.metric("🟢 Benign Records", benign_records)
-
-    col4, col5, col6 = st.columns(3)
-
-    col4.metric("🔴 High Risk Incidents", high_risk_incidents)
-
-    col5.metric("🚨 Anomalies Detected", anomalies_detected)
-
-    col6.metric("📈 Detection Rate", f"{detection_rate:.2f}%")
-
-    # ==========================================
-    # Prediction Summary
-    # ==========================================
-
-    st.subheader("📈 Prediction Summary")
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("🚨 Total Anomalies", anomalies_detected)
-
-    col2.metric("🟢 Normal Traffic", total_normal)
-
-    col3.metric("⚠️ Suspicious %", f"{suspicious_percentage:.2f}%")
-
-    # ==========================================
-    # Threat Detection Table
-    # ==========================================
-
-    st.subheader("Threat Detection Results")
-
-    display_columns = []
-
-    if "Destination Port" in df.columns:
-        display_columns.append("Destination Port")
-
-    if "Flow Duration" in df.columns:
-        display_columns.append("Flow Duration")
-
-    display_columns.extend(["Prediction", "Risk"])
-
-    df = df.reset_index(drop=True)
-
-    st.dataframe(df[display_columns])
-
-    # ==========================================
-    # Gemini AI Explanation
-    # ==========================================
-
-    st.subheader("🤖 AI Threat Explanation")
-
-    suspicious = df[df["Prediction"] == "Suspicious"]
+    st.dataframe(
+        df[["Destination Port","Flow Duration","Prediction","Risk"]],
+        use_container_width=True,
+        height=350
+    )
 
     if suspicious.empty:
-        st.success("✅ No suspicious traffic detected.")
+        st.success("No suspicious traffic detected.")
         return
 
-    row = suspicious.iloc[0]
+    row=suspicious.iloc[0]
+    attack="Port Scan"
+    mitre=get_attack_details(attack)
 
-    st.info("A suspicious network flow has been detected.")
+    st.subheader("🛡 Threat Summary")
+    left,right=st.columns(2)
+    with left:
+        st.info(f"**Attack:** {attack}")
+        st.write(f"Destination Port: {row['Destination Port']}")
+        st.write(f"Flow Duration: {row['Flow Duration']}")
+        st.write(f"Risk: {row['Risk']}")
+    with right:
+        st.write(f"**MITRE Tactic:** {mitre['tactic']}")
+        st.write(f"**Technique:** {mitre['technique']}")
+        st.code(mitre["technique_id"])
 
-    st.write("**Destination Port:**", row["Destination Port"])
-    st.write("**Flow Duration:**", row["Flow Duration"])
-    st.write("**Prediction:**", row["Prediction"])
-    st.write("**Risk Level:**", row["Risk"])
-
-    # ==========================================
-    # Determine Attack Type
-    # ==========================================
-
-    # Example mapping (replace with your own logic later)
-    if row["Prediction"] == "Suspicious":
-        attack_name = "Port Scan"
-    else:
-        attack_name = None
-
-    # ==========================================
-    # MITRE ATT&CK Lookup
-    # ==========================================
-
-    mitre = None  # Instantiated to prevent potential UnboundLocalError
-    if attack_name:
-        mitre = get_attack_details(attack_name)
-
-        if mitre:
-            st.subheader("🛡 MITRE ATT&CK Mapping")
-
-            st.write("### Attack")
-            st.success(attack_name)
-
-            st.write("### Tactic")
-            st.info(mitre["tactic"])
-
-            st.write("### Technique")
-            st.info(mitre["technique"])
-
-            st.write("### Technique ID")
-            st.code(mitre["technique_id"])
-
-            st.write("### Description")
-            st.write(mitre["description"])
-
-            st.write("### Mitigation")
-            st.warning(mitre["mitigation"])
-
-    # ==========================================
-    # Analyze Button
-    # ==========================================
-
-    if st.button("🤖 Analyze with Gemini"):
-        with st.spinner("Analyzing threat using Gemini AI..."):
-            explanation = explain_threat(
-                destination_port=row["Destination Port"],
-                flow_duration=row["Flow Duration"],
-                prediction=row["Prediction"],
-                risk=row["Risk"],
-                tactic=mitre["tactic"] if mitre else "N/A",
-                technique=mitre["technique"] if mitre else "N/A",
-                technique_id=mitre["technique_id"] if mitre else "N/A",
-                description=mitre["description"] if mitre else "N/A",
-                mitigation=mitre["mitigation"] if mitre else "N/A",
+    if st.button("🤖 Analyze with Gemini",use_container_width=True):
+        with st.spinner("Generating AI explanation..."):
+            exp=explain_threat(
+                row["Destination Port"],row["Flow Duration"],
+                attack,row["Risk"],
+                mitre["tactic"],mitre["technique"],
+                mitre["technique_id"],mitre["description"],
+                mitre["mitigation"]
             )
-            st.session_state["explanation"] = explanation
+            st.session_state["exp"]=exp
 
-    # ==========================================
-    # Display AI Explanation
-    # ==========================================
+            try:
+                insert_incident(
+                    destination_port=row["Destination Port"],
+                    flow_duration=row["Flow Duration"],
+                    prediction="Suspicious",
+                    risk=row["Risk"],
+                    attack_type=attack,
+                    tactic=mitre["tactic"],
+                    technique=mitre["technique"],
+                    technique_id=mitre["technique_id"],
+                    description=mitre["description"],
+                    mitigation=mitre["mitigation"],
+                    gemini_explanation=exp
+                )
+            except Exception:
+                pass
 
-    if "explanation" in st.session_state:
-        st.subheader("📝 AI Analysis")
-        st.success(st.session_state["explanation"])
-
-        # ==========================================
-        # PDF Report
-        # ==========================================
-
-        if st.button("📄 Generate Incident Report"):
+    if "exp" in st.session_state:
+        st.success(st.session_state["exp"])
+        if st.button("📄 Generate PDF Report",use_container_width=True):
             generate_report(
-                destination_port=row["Destination Port"],
-                flow_duration=row["Flow Duration"],
-                prediction=row["Prediction"],
-                risk=row["Risk"],
-                explanation=st.session_state["explanation"],
+                row["Destination Port"],row["Flow Duration"],
+                "Suspicious",row["Risk"],st.session_state["exp"],
+                mitre["tactic"],mitre["technique"],
+                mitre["technique_id"],mitre["description"],
+                mitre["mitigation"]
             )
-
-            st.success("✅ Incident Report Generated Successfully!")
-            st.info("Saved at:\n\nreports/generated/Incident_Report.pdf")
-            st.write("**Destination Port:**", row["Destination Port"])
-            st.write("**Flow Duration:**", row["Flow Duration"])
-            st.write("**Prediction:**", row["Prediction"])
-            st.write("**Risk Level:**", row["Risk"])
+            st.success("Report generated successfully.")

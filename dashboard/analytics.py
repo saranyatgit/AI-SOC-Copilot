@@ -1,110 +1,57 @@
 import streamlit as st
-import matplotlib.pyplot as plt
+import plotly.express as px
 
 from ml.anomaly_detector import (
     load_processed_data,
     prepare_features,
     load_model,
-    predict_anomalies
+    predict_anomalies,
 )
-
 from utils.risk_score import assign_risk
 
 
 def show_analytics():
-
     st.title("📊 Security Analytics")
 
     df = load_processed_data()
-
     features = prepare_features(df)
-
     model = load_model()
 
-    prediction = predict_anomalies(model, features)
-
-    df["Prediction"] = prediction
-
-    df["Prediction"] = df["Prediction"].replace({
-        1: "Normal",
-        -1: "Suspicious"
-    })
-
+    pred = predict_anomalies(model, features)
+    df["Prediction"] = ["Normal" if p == 1 else "Suspicious" for p in pred]
     df["Risk"] = df["Prediction"].apply(assign_risk)
 
-    # -----------------------------
-    # Pie Chart
-    # -----------------------------
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total Flows", len(df))
+    c2.metric("Suspicious", (df["Prediction"]=="Suspicious").sum())
+    c3.metric("High Risk", (df["Risk"]=="🔴 High").sum())
 
-    st.subheader("🥧 Normal vs Attack")
-
-    if "Label" in df.columns:
-
-        normal = (df["Label"] == "BENIGN").sum()
-
-        attack = (df["Label"] != "BENIGN").sum()
-
-        fig, ax = plt.subplots()
-
-        ax.pie(
-            [normal, attack],
-            labels=["Normal", "Attack"],
-            autopct="%1.1f%%"
-        )
-
-        st.pyplot(fig)
-
-    # -----------------------------
-    # Attack Types
-    # -----------------------------
-
-    st.subheader("📊 Attack Types")
+    st.divider()
 
     if "Label" in df.columns:
-
-        attacks = df[df["Label"] != "BENIGN"]
-
-        attack_counts = attacks["Label"].value_counts()
-
-        fig, ax = plt.subplots(figsize=(10,4))
-
-        ax.bar(
-            attack_counts.index,
-            attack_counts.values
+        pie = df["Label"].replace({"BENIGN":"Normal"})
+        fig = px.pie(
+            names=pie.value_counts().index,
+            values=pie.value_counts().values,
+            title="Traffic Distribution"
         )
+        st.plotly_chart(fig, use_container_width=True)
 
-        plt.xticks(rotation=60)
+        attack_df = df[df["Label"]!="BENIGN"]["Label"].value_counts().reset_index()
+        attack_df.columns=["Attack","Count"]
+        fig2 = px.bar(
+            attack_df,
+            x="Attack",
+            y="Count",
+            title="Attack Categories"
+        )
+        st.plotly_chart(fig2, use_container_width=True)
 
-        st.pyplot(fig)
+    if "Destination Port" in df.columns:
+        ports = df["Destination Port"].value_counts().head(10).reset_index()
+        ports.columns=["Port","Count"]
+        fig3 = px.bar(ports,x="Port",y="Count",title="Top Destination Ports")
+        st.plotly_chart(fig3,use_container_width=True)
 
-    # -----------------------------
-    # Destination Ports
-    # -----------------------------
-
-    st.subheader("🌐 Top Destination Ports")
-
-    ports = df["Destination Port"].value_counts().head(10)
-
-    fig, ax = plt.subplots(figsize=(8,4))
-
-    ax.bar(
-        ports.index.astype(str),
-        ports.values
-    )
-
-    st.pyplot(fig)
-
-    # -----------------------------
-    # Flow Duration
-    # -----------------------------
-
-    st.subheader("📈 Flow Duration Distribution")
-
-    fig, ax = plt.subplots()
-
-    ax.hist(
-        df["Flow Duration"],
-        bins=20
-    )
-
-    st.pyplot(fig)
+    fig4 = px.histogram(df,x="Flow Duration",nbins=30,title="Flow Duration Distribution")
+    st.plotly_chart(fig4,use_container_width=True)

@@ -1,38 +1,63 @@
-import streamlit as st
 
-from ml.anomaly_detector import (
-    load_processed_data,
-    prepare_features,
-    load_model,
-    predict_anomalies
+import streamlit as st
+import pandas as pd
+from utils.incident_db import (
+    init_db,get_all_incidents,
+    update_incident_status,
+    delete_incident,get_incident_stats
 )
 
-from utils.risk_score import assign_risk
-
+STATUS=["Open","Investigating","Resolved"]
 
 def show_incidents():
+    init_db()
+    st.title("📑 Incident Management")
 
-    st.title("🚨 Incident Management")
+    stats=get_incident_stats()
+    c1,c2,c3,c4,c5=st.columns(5)
+    c1.metric("Total",stats["total"])
+    c2.metric("Open",stats["open"])
+    c3.metric("Investigating",stats["investigating"])
+    c4.metric("Resolved",stats["resolved"])
+    c5.metric("High Risk",stats["high_risk"])
 
-    df = load_processed_data()
+    st.divider()
 
-    features = prepare_features(df)
+    search=st.text_input("🔍 Search Attack / Technique")
+    status=st.selectbox("Status",["All"]+STATUS)
 
-    model = load_model()
+    rows=get_all_incidents(status=status)
 
-    prediction = predict_anomalies(model, features)
+    if search:
+        rows=[r for r in rows if search.lower() in str(r).lower()]
 
-    df["Prediction"] = prediction
+    if not rows:
+        st.info("No incidents found.")
+        return
 
-    df["Prediction"] = df["Prediction"].replace({
-        1: "Normal",
-        -1: "Suspicious"
-    })
+    df=pd.DataFrame(rows)
+    st.dataframe(df,use_container_width=True,height=320)
 
-    df["Risk"] = df["Prediction"].apply(assign_risk)
+    st.divider()
 
-    incidents = df[df["Prediction"] == "Suspicious"]
+    ids=df["id"].tolist()
+    iid=st.selectbox("Incident",ids)
+    row=next(r for r in rows if r["id"]==iid)
 
-    st.write(f"Total Incidents: {len(incidents)}")
+    st.subheader(f"Incident #{iid}")
+    st.json(row)
 
-    st.dataframe(incidents)
+    new=st.selectbox("Update Status",STATUS,index=STATUS.index(row["status"]))
+    col1,col2=st.columns(2)
+
+    with col1:
+        if st.button("💾 Save Status",use_container_width=True):
+            update_incident_status(iid,new)
+            st.success("Status updated.")
+            st.rerun()
+
+    with col2:
+        if st.button("🗑 Delete",use_container_width=True):
+            delete_incident(iid)
+            st.success("Incident deleted.")
+            st.rerun()

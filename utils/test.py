@@ -1,7 +1,5 @@
-model = load_model()
+import joblib
 
-print("Model features:")
+model = joblib.load("models/isolation_forest.pkl")
+
 print(model.feature_names_in_)
-
-print("\nCurrent features:")
-print(features.columns.tolist())
